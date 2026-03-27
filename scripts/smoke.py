@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +47,18 @@ def t_site_weather():
     ok = r.get("ok") is True and "weather" in r
     preview = (r.get("weather", "") or "").splitlines()[0:1]
     return ok, preview[0] if preview else "<empty>"
+
+
+def t_weather_view_normal():
+    r = run_tool("wttr_weather_view", {"location": "Saint Petersburg", "agent": "openclaw", "days": 2})
+    text = r.get("text", "")
+    ok = (
+        r.get("ok") is True
+        and r.get("view") == "normal"
+        and "Now:" in text
+        and "Forecast" in text
+    )
+    return ok, r.get("view")
 
 
 def t_api_current():
@@ -103,6 +114,7 @@ def main():
     tests = [
         ("help", t_help),
         ("site-weather", t_site_weather),
+        ("weather-view-normal", t_weather_view_normal),
         ("api-current", t_api_current),
         ("api-forecast", t_api_forecast),
         ("raw-translation", t_raw_translation),

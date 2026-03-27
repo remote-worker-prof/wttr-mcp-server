@@ -28,5 +28,10 @@ The codebase follows a layered split inspired by Martin Fowler's style of keepin
 3. **Factory / Composition Root**
    - `createWttrMcpServer()` assembles dependencies and handlers in one place
 
-4. **DTO-style response objects**
+4. **Strategy + Factory (weather views)**
+   - `createWeatherViewService()` resolves an output strategy by `agent`/`view`
+   - Strategies: `normal`, `ascii_compact`, `ascii_full`, `ascii_one_line`
+   - This keeps formatting policies separate from transport and raw fetching
+
+5. **DTO-style response objects**
    - Tool responses are explicit plain objects for stable MCP payloads

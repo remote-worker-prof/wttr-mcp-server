@@ -1,5 +1,6 @@
 import { parseCurrentFromApi, parseForecastFromApi } from "../domain/weather-parsers.mjs";
 import { requireEnum, requireIntInRange, requireString } from "../domain/validation.mjs";
+import { WEATHER_AGENTS, WEATHER_VIEWS, createWeatherViewService } from "./weather-view-service.mjs";
 
 const UNITS = ["auto", "metric", "us"];
 const RESPONSE_TYPES = ["text", "json", "base64"];
@@ -39,6 +40,8 @@ function toMcpError(error, code = "UPSTREAM") {
 }
 
 export function createToolRegistry({ wttrClient }) {
+  const weatherViewService = createWeatherViewService({ wttrClient });
+
   const tools = [
     {
       name: "wttr_site_weather",
@@ -85,6 +88,39 @@ export function createToolRegistry({ wttrClient }) {
           weather: text.trim(),
         };
       },
+    },
+    {
+      name: "wttr_weather_view",
+      description:
+        "Human-friendly weather view with agent-specific defaults and ASCII variants (Strategy + Factory pattern).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "City/region/airport/domain/GPS, e.g. 'Saint Petersburg'" },
+          agent: {
+            type: "string",
+            enum: WEATHER_AGENTS,
+            default: "auto",
+            description: "Agent profile that sets sensible defaults for weather output format.",
+          },
+          view: {
+            type: "string",
+            enum: WEATHER_VIEWS,
+            description: "Optional explicit view override.",
+          },
+          ansi: {
+            type: "boolean",
+            description: "Force ANSI color preservation/removal for ASCII views. Defaults come from agent profile.",
+          },
+          days: { type: "integer", minimum: 1, maximum: 3, default: 2 },
+          lang: { type: "string", description: "Optional language code, e.g. 'ru'" },
+          units: { type: "string", enum: UNITS, default: "auto" },
+          windInMps: { type: "boolean", default: false },
+          acceptLanguage: { type: "string", description: "Optional Accept-Language header" },
+        },
+        required: ["location"],
+      },
+      execute: async (args = {}) => weatherViewService.render(args),
     },
     {
       name: "wttr_raw_request",

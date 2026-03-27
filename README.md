@@ -10,6 +10,7 @@ If you want weather tools that are easy to wire into agents, this repo is for yo
 
 ## ✨ What you get
 
+- `wttr_weather_view` → human-friendly weather output with agent profiles (`openclaw`, `codex`, `cursor`, `terminal`) and ASCII variants
 - `wttr_site_weather` → quick weather view (`3/0/1/2/v2/0pq` or custom `%...` format)
 - `wttr_raw_request` → raw access to wttr endpoints (moon, PNG, special URLs, combined options)
 - `wttr_api_current` → structured current weather from `format=j1`
@@ -26,6 +27,18 @@ npm start
 ```
 
 ---
+
+## 🧭 "Normal" vs ASCII output through MCP
+
+Use `wttr_weather_view` when you want readable output without digging into raw JSON.
+
+Examples:
+- **Normal summary**: `agent=openclaw` (default: clean text, no ANSI)
+- **ASCII for Codex/Cursor/Cline**: `agent=codex` or `agent=cursor`
+- **Terminal full ASCII with colors**: `agent=terminal` or `view=ascii_full&ansi=true`
+- **Force one-line output**: `view=ascii_one_line`
+
+You can still call low-level tools (`wttr_api_current`, `wttr_site_weather`, `wttr_raw_request`) when you need full control.
 
 ## 🧪 Smoke test
 
