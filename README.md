@@ -6,7 +6,7 @@ depending on which tool you call.
 
 The project is built for day-to-day use in editor agents, chat UIs, and workflow systems.
 
-## what it does
+## 🌦️ what it does
 
 - `wttr_weather_view` — readable weather summaries plus ASCII views.
 - `wttr_site_weather` — direct wttr mode output (`0`, `1`, `2`, `3`, `v2`, `0pq`, `%...`).
@@ -15,7 +15,7 @@ The project is built for day-to-day use in editor agents, chat UIs, and workflow
 - `wttr_api_forecast` — structured forecast data.
 - `wttr_help` — full `wttr.in/:help` output.
 
-## result profiles
+## 🎛️ result profiles
 
 MCP clients don’t always treat responses the same way, so the server supports three presentation profiles:
 
@@ -29,7 +29,7 @@ Profile resolution order:
 2. environment variable `WTTR_MCP_RESULT_PROFILE`
 3. fallback to `default`
 
-## weather view profiles
+## 🧭 weather view profiles
 
 `wttr_weather_view` has agent-oriented defaults:
 
@@ -44,14 +44,14 @@ Available views:
 - `ascii_full`
 - `ascii_one_line`
 
-## quick start
+## 🚀 quick start
 
 ```bash
 npm install
 npm start
 ```
 
-## local examples
+## 💻 local examples
 
 ```bash
 # readable summary
@@ -67,7 +67,7 @@ mcporter call wttr-mcp.wttr_api_current \
   --args '{"location":"Saint Petersburg","lang":"ru"}'
 ```
 
-## quality checks
+## ✅ quality checks
 
 ```bash
 npm run check:docs   # exported entities must have Args/Returns/Throws docblocks
@@ -85,7 +85,7 @@ make ci
 make smoke
 ```
 
-## install helpers
+## 🧰 install helpers
 
 The repository includes installer scripts and Make targets for common MCP hosts.
 
@@ -115,14 +115,14 @@ make install-generic-docker CONFIG=~/.config/Claude/claude_desktop_config.json R
 make install-generic-http CONFIG=~/.codeium/windsurf/mcp_config.json ROOT_KEY=mcpServers HTTP_URL=https://host.example/mcp
 ```
 
-## docker
+## 🐳 docker
 
 ```bash
 docker build -t markstroinyi/wttr-mcp-server:0.3.0 .
 docker run --rm -i markstroinyi/wttr-mcp-server:0.3.0
 ```
 
-## architecture in short
+## 🏗️ architecture in short
 
 - `src/domain` — validation and API parsing.
 - `src/infrastructure` — upstream wttr HTTP adapter.
@@ -138,6 +138,6 @@ Patterns used in production code:
 
 For a full walkthrough, see `docs/architecture.md` and `docs/practical-launch-targets.md`.
 
-## license
+## 📄 license
 
 MIT
