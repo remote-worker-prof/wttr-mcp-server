@@ -39,7 +39,9 @@ docker build -t markstroinyi/wttr-mcp-server:0.3.0 .
 docker run --rm -i markstroinyi/wttr-mcp-server:0.3.0
 ```
 
-## MCP config example
+## MCP config examples
+
+### Local source install
 
 ```json
 {
@@ -47,6 +49,19 @@ docker run --rm -i markstroinyi/wttr-mcp-server:0.3.0
     "wttr-mcp": {
       "command": "node",
       "args": ["/home/sorcerer/Projects/wttr-mcp-server/src/index.mjs"]
+    }
+  }
+}
+```
+
+### DockerHub install
+
+```json
+{
+  "mcpServers": {
+    "wttr-mcp": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "markstroinyi/wttr-mcp-server:latest"]
     }
   }
 }
