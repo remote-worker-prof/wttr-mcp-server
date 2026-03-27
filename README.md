@@ -105,6 +105,9 @@ make install-cline-vscode-source
 
 # Windsurf
 make install-windsurf-source
+
+# Codex CLI (~/.codex/config.toml)
+make install-codex-source
 ```
 
 You can also install into any custom JSON config:
@@ -113,6 +116,8 @@ You can also install into any custom JSON config:
 make install-generic-source CONFIG=~/.cursor/mcp.json ROOT_KEY=mcpServers
 make install-generic-docker CONFIG=~/.config/Claude/claude_desktop_config.json ROOT_KEY=mcpServers
 ```
+
+For Codex, installer writes a TOML section under `[mcp_servers.<name>]` in `~/.codex/config.toml`.
 
 ## License
 

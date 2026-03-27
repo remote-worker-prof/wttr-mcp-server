@@ -9,6 +9,8 @@ CLAUDE_MAC_CONFIG ?= $(HOME)/Library/Application Support/Claude/claude_desktop_c
 CURSOR_CONFIG ?= $(HOME)/.cursor/mcp.json
 VSCODE_SETTINGS ?= $(HOME)/.config/Code/User/settings.json
 WINDSURF_CONFIG ?= $(HOME)/.codeium/windsurf/mcp_config.json
+CODEX_CONFIG ?= $(HOME)/.codex/config.toml
+CODEX_SERVER_NAME ?= wttr_mcp
 
 .PHONY: help install-deps run test smoke docker-build docker-push docker-run \
 	install-openclaw-source install-openclaw-docker \
@@ -17,6 +19,7 @@ WINDSURF_CONFIG ?= $(HOME)/.codeium/windsurf/mcp_config.json
 	install-cursor-source install-cursor-docker \
 	install-cline-vscode-source install-cline-vscode-docker \
 	install-windsurf-source install-windsurf-docker \
+	install-codex-source install-codex-docker \
 	install-generic-source install-generic-docker
 
 help:
@@ -40,6 +43,7 @@ help:
 	@echo "  make install-cursor-source"
 	@echo "  make install-cline-vscode-source"
 	@echo "  make install-windsurf-source"
+	@echo "  make install-codex-source"
 	@echo ""
 	@echo "Generic install examples:"
 	@echo "  make install-generic-source CONFIG=~/.cursor/mcp.json ROOT_KEY=mcpServers"
@@ -102,6 +106,12 @@ install-windsurf-source:
 
 install-windsurf-docker:
 	python3 scripts/install_mcp.py --config "$(WINDSURF_CONFIG)" --root-key mcpServers --server-name $(SERVER_NAME) --mode docker --project-root "$(PROJECT_ROOT)" --docker-image "$(DOCKER_IMAGE)"
+
+install-codex-source:
+	python3 scripts/install_codex.py --config "$(CODEX_CONFIG)" --server-name "$(CODEX_SERVER_NAME)" --mode source --project-root "$(PROJECT_ROOT)" --docker-image "$(DOCKER_IMAGE)"
+
+install-codex-docker:
+	python3 scripts/install_codex.py --config "$(CODEX_CONFIG)" --server-name "$(CODEX_SERVER_NAME)" --mode docker --project-root "$(PROJECT_ROOT)" --docker-image "$(DOCKER_IMAGE)"
 
 install-generic-source:
 	@test -n "$(CONFIG)" || (echo "CONFIG is required" && exit 1)
