@@ -1,14 +1,39 @@
 #!/usr/bin/env python3
+"""Smoke tests for wttr-mcp-server over stdio via mcporter.
+
+This suite is intentionally high-signal and low-overhead:
+- it validates end-to-end tool wiring,
+- exercises core success paths,
+- and verifies one known upstream failure path.
+"""
+
+from __future__ import annotations
+
 import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, Callable, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER_CMD = f"node {ROOT / 'src' / 'index.mjs'}"
+TestFn = Callable[[], Tuple[bool, Any]]
 
 
-def run_tool(tool: str, args: dict):
+def run_tool(tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Call a tool over stdio using mcporter.
+
+    Args:
+        tool: MCP tool name.
+        args: JSON-serializable arguments for the tool.
+
+    Returns:
+        Parsed JSON response from mcporter.
+
+    Raises:
+        subprocess.CalledProcessError: If command execution fails.
+        json.JSONDecodeError: If output is not valid JSON.
+    """
     cmd = [
         "mcporter",
         "call",
@@ -18,103 +43,153 @@ def run_tool(tool: str, args: dict):
         "--args",
         json.dumps(args, ensure_ascii=False),
     ]
-    out = subprocess.check_output(cmd, text=True)
-    return json.loads(out)
+    output = subprocess.check_output(cmd, text=True)
+    return json.loads(output)
 
 
-def check(name: str, fn):
+def check(name: str, fn: TestFn) -> bool:
+    """Run one smoke test and print status line.
+
+    Args:
+        name: Human-readable test name.
+        fn: Test function returning `(ok, details)`.
+
+    Returns:
+        True when test passed, False otherwise.
+    """
     try:
         ok, details = fn()
         status = "PASS" if ok else "FAIL"
         print(f"[{status}] {name}: {details}")
         return ok
-    except subprocess.CalledProcessError as e:
-        print(f"[FAIL] {name}: command failed\n{e.output}")
+    except subprocess.CalledProcessError as error:
+        print(f"[FAIL] {name}: command failed\n{error.output}")
         return False
-    except Exception as e:
-        print(f"[FAIL] {name}: {e}")
+    except Exception as error:  # pylint: disable=broad-except
+        print(f"[FAIL] {name}: {error}")
         return False
 
 
-def t_help():
-    r = run_tool("wttr_help", {})
-    ok = r.get("ok") is True and ":help" in r.get("url", "")
-    return ok, r.get("contentType", "")
+def t_help() -> Tuple[bool, Any]:
+    """Validate wttr_help endpoint basics."""
+    response = run_tool("wttr_help", {})
+    ok = response.get("ok") is True and ":help" in response.get("url", "")
+    return ok, response.get("contentType", "")
 
 
-def t_site_weather():
-    r = run_tool("wttr_site_weather", {"location": "Saint Petersburg", "mode": "3", "lang": "ru"})
-    ok = r.get("ok") is True and "weather" in r
-    preview = (r.get("weather", "") or "").splitlines()[0:1]
+def t_site_weather() -> Tuple[bool, Any]:
+    """Validate quick site-weather text response."""
+    response = run_tool("wttr_site_weather", {"location": "Saint Petersburg", "mode": "3", "lang": "ru"})
+    ok = response.get("ok") is True and "weather" in response
+    preview = (response.get("weather", "") or "").splitlines()[0:1]
     return ok, preview[0] if preview else "<empty>"
 
 
-def t_weather_view_normal():
-    r = run_tool("wttr_weather_view", {"location": "Saint Petersburg", "agent": "openclaw", "days": 2})
-    text = r.get("text", "")
+def t_weather_view_normal() -> Tuple[bool, Any]:
+    """Validate default summary strategy output."""
+    response = run_tool("wttr_weather_view", {"location": "Saint Petersburg", "agent": "openclaw", "days": 2})
+    text = response.get("text", "")
+    ok = response.get("ok") is True and response.get("view") == "normal" and "Now:" in text and "Forecast" in text
+    return ok, response.get("view")
+
+
+def t_weather_view_ascii_codex() -> Tuple[bool, Any]:
+    """Validate codex profile: compact ASCII and no ANSI codes."""
+    response = run_tool("wttr_weather_view", {"location": "Saint Petersburg", "agent": "codex", "lang": "ru"})
+    text = response.get("text", "")
     ok = (
-        r.get("ok") is True
-        and r.get("view") == "normal"
-        and "Now:" in text
-        and "Forecast" in text
+        response.get("ok") is True
+        and response.get("view") == "ascii_compact"
+        and isinstance(text, str)
+        and len(text.splitlines()) >= 5
+        and "\u001b[" not in text
     )
-    return ok, r.get("view")
+    return ok, response.get("view")
 
 
-def t_api_current():
-    r = run_tool("wttr_api_current", {"location": "Saint Petersburg", "lang": "ru"})
-    c = r.get("current", {})
-    ok = r.get("ok") is True and isinstance(c, dict) and "temperatureC" in c
-    return ok, {k: c.get(k) for k in ["temperatureC", "feelsLikeC", "humidity", "condition"]}
+def t_weather_view_ascii_terminal_ansi() -> Tuple[bool, Any]:
+    """Validate terminal profile: full ASCII with ANSI kept."""
+    response = run_tool(
+        "wttr_weather_view",
+        {"location": "Saint Petersburg", "agent": "terminal", "lang": "ru", "ansi": True},
+    )
+    text = response.get("text", "")
+    ok = (
+        response.get("ok") is True
+        and response.get("view") == "ascii_full"
+        and isinstance(text, str)
+        and "\u001b[" in text
+    )
+    return ok, response.get("view")
 
 
-def t_api_forecast():
-    r = run_tool("wttr_api_forecast", {"location": "Saint Petersburg", "days": 2})
-    f = r.get("forecast", [])
-    ok = r.get("ok") is True and isinstance(f, list) and len(f) == 2
-    return ok, f"days={len(f)}"
+def t_api_current() -> Tuple[bool, Any]:
+    """Validate structured current-weather payload."""
+    response = run_tool("wttr_api_current", {"location": "Saint Petersburg", "lang": "ru"})
+    current = response.get("current", {})
+    ok = response.get("ok") is True and isinstance(current, dict) and "temperatureC" in current
+    return ok, {key: current.get(key) for key in ["temperatureC", "feelsLikeC", "humidity", "condition"]}
 
 
-def t_raw_translation():
-    r = run_tool("wttr_raw_request", {"path": ":translation"})
-    txt = r.get("text", "")
-    ok = r.get("ok") is True and "translated" in txt
+def t_api_forecast() -> Tuple[bool, Any]:
+    """Validate 2-day forecast branch and count."""
+    response = run_tool("wttr_api_forecast", {"location": "Saint Petersburg", "days": 2})
+    forecast = response.get("forecast", [])
+    ok = response.get("ok") is True and isinstance(forecast, list) and len(forecast) == 2
+    return ok, f"days={len(forecast)}"
+
+
+def t_raw_translation() -> Tuple[bool, Any]:
+    """Validate raw translation endpoint response."""
+    response = run_tool("wttr_raw_request", {"path": ":translation"})
+    text = response.get("text", "")
+    ok = response.get("ok") is True and "translated" in text
     return ok, "translation text present"
 
 
-def t_raw_png():
-    r = run_tool(
+def t_raw_png() -> Tuple[bool, Any]:
+    """Validate PNG binary path encoded as base64."""
+    response = run_tool(
         "wttr_raw_request",
         {"path": "Paris.png", "query": "p&transparency=150", "responseType": "base64"},
     )
     ok = (
-        r.get("ok") is True
-        and str(r.get("contentType", "")).startswith("image/")
-        and int(r.get("bytes", 0)) > 1000
-        and isinstance(r.get("base64"), str)
-        and len(r.get("base64", "")) > 100
+        response.get("ok") is True
+        and str(response.get("contentType", "")).startswith("image/")
+        and int(response.get("bytes", 0)) > 1000
+        and isinstance(response.get("base64"), str)
+        and len(response.get("base64", "")) > 100
     )
-    return ok, {"contentType": r.get("contentType"), "bytes": r.get("bytes")}
+    return ok, {"contentType": response.get("contentType"), "bytes": response.get("bytes")}
 
 
-def t_raw_accept_language():
-    r = run_tool("wttr_raw_request", {"path": "Paris", "query": "3", "acceptLanguage": "fr"})
-    ok = r.get("ok") is True and "Prévisions" in r.get("text", "")
+def t_raw_accept_language() -> Tuple[bool, Any]:
+    """Validate locale override through Accept-Language header."""
+    response = run_tool("wttr_raw_request", {"path": "Paris", "query": "3", "acceptLanguage": "fr"})
+    ok = response.get("ok") is True and "Prévisions" in response.get("text", "")
     return ok, "fr locale response"
 
 
-def t_known_upstream_500():
-    r = run_tool("wttr_raw_request", {"path": ":bash.function"})
-    e = r.get("error", {})
-    ok = r.get("ok") is False and e.get("code") == "UPSTREAM"
-    return ok, e.get("message")
+def t_known_upstream_500() -> Tuple[bool, Any]:
+    """Validate known upstream failure is mapped to UPSTREAM error code."""
+    response = run_tool("wttr_raw_request", {"path": ":bash.function"})
+    error = response.get("error", {})
+    ok = response.get("ok") is False and error.get("code") == "UPSTREAM"
+    return ok, error.get("message")
 
 
-def main():
-    tests = [
+def main() -> int:
+    """Run smoke suite and return process exit code.
+
+    Returns:
+        0 if all tests pass, otherwise 1.
+    """
+    tests: list[tuple[str, TestFn]] = [
         ("help", t_help),
         ("site-weather", t_site_weather),
         ("weather-view-normal", t_weather_view_normal),
+        ("weather-view-ascii-codex", t_weather_view_ascii_codex),
+        ("weather-view-ascii-terminal-ansi", t_weather_view_ascii_terminal_ansi),
         ("api-current", t_api_current),
         ("api-forecast", t_api_forecast),
         ("raw-translation", t_raw_translation),
@@ -125,6 +200,7 @@ def main():
 
     all_ok = True
     for name, fn in tests:
+        # Evaluate every test even when one fails to keep debugging visibility high.
         all_ok = check(name, fn) and all_ok
 
     if all_ok:
