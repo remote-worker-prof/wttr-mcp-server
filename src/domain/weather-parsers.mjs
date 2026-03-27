@@ -1,8 +1,51 @@
 /**
+ * Normalizes language key to wttr JSON suffix format.
+ *
+ * Args:
+ *   langCode: Requested language code (e.g. ru, ru-RU, en-US).
+ *
+ * Returns:
+ *   Normalized short language token (e.g. ru, en).
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function normalizeLangCode(langCode) {
+  return String(langCode || "").toLowerCase().split(/[-_,]/)[0];
+}
+
+/**
+ * Picks localized condition text from wttr payload entry.
+ *
+ * Args:
+ *   entry: wttr condition entry (current/hourly).
+ *   langCode: Requested language code.
+ *
+ * Returns:
+ *   Localized condition if available, otherwise default weatherDesc value.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function pickConditionText(entry, langCode) {
+  const normalizedLang = normalizeLangCode(langCode);
+  const localizedKey = normalizedLang ? `lang_${normalizedLang}` : "";
+
+  const localized = localizedKey ? entry?.[localizedKey]?.[0]?.value : null;
+  if (typeof localized === "string" && localized.trim()) {
+    return localized.trim();
+  }
+
+  const fallback = entry?.weatherDesc?.[0]?.value;
+  return typeof fallback === "string" ? fallback.trim() : null;
+}
+
+/**
  * Parses current weather conditions from wttr JSON API payload.
  *
  * Args:
  *   apiData: Raw JSON payload from wttr `format=j1` endpoint.
+ *   langCode: Preferred condition language code.
  *
  * Returns:
  *   Normalized object with current weather attributes.
@@ -10,7 +53,7 @@
  * Throws:
  *   Error: If `current_condition` is missing.
  */
-export function parseCurrentFromApi(apiData) {
+export function parseCurrentFromApi(apiData, { langCode } = {}) {
   // wttr keeps current conditions as a single-element array.
   const current = apiData?.current_condition?.[0];
   if (!current) {
@@ -29,7 +72,7 @@ export function parseCurrentFromApi(apiData) {
     windDirection: current.winddir16Point,
     pressure: current.pressure,
     uvIndex: current.uvIndex,
-    condition: current.weatherDesc?.[0]?.value,
+    condition: pickConditionText(current, langCode),
     precipitationMm: current.precipMM,
     cloudCover: current.cloudcover,
   };
@@ -41,6 +84,7 @@ export function parseCurrentFromApi(apiData) {
  * Args:
  *   apiData: Raw JSON payload from wttr `format=j1` endpoint.
  *   days: Number of forecast days to keep (1..3).
+ *   langCode: Preferred condition language code.
  *
  * Returns:
  *   List of normalized forecast-day objects.
@@ -48,7 +92,7 @@ export function parseCurrentFromApi(apiData) {
  * Throws:
  *   Error: Never thrown intentionally; returns empty list for missing forecast sections.
  */
-export function parseForecastFromApi(apiData, days) {
+export function parseForecastFromApi(apiData, days, { langCode } = {}) {
   // Slice first, then map, so consumers receive deterministic day count.
   const weatherDays = Array.isArray(apiData?.weather) ? apiData.weather.slice(0, days) : [];
 
@@ -75,7 +119,7 @@ export function parseForecastFromApi(apiData, days) {
       chanceOfSnow: hourlyEntry.chanceofsnow,
       windKmph: hourlyEntry.windspeedKmph,
       windDir: hourlyEntry.winddir16Point,
-      condition: hourlyEntry.weatherDesc?.[0]?.value,
+      condition: pickConditionText(hourlyEntry, langCode),
     })),
   }));
 }

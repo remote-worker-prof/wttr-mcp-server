@@ -179,9 +179,13 @@ function safeNumber(value) {
  * Throws:
  *   Error: Never thrown intentionally.
  */
+function resolveLangCode({ lang, acceptLanguage }) {
+  return String(lang || acceptLanguage || "en").toLowerCase().split(/[-_,]/)[0] || "en";
+}
+
 function resolveLocale({ lang, acceptLanguage }) {
-  const candidate = (lang || acceptLanguage || "").toLowerCase();
-  return candidate.startsWith("ru") ? "ru" : "en";
+  const langCode = resolveLangCode({ lang, acceptLanguage });
+  return langCode.startsWith("ru") ? "ru" : "en";
 }
 
 /**
@@ -198,13 +202,13 @@ function resolveLocale({ lang, acceptLanguage }) {
  */
 function pickConditionEmoji(condition) {
   const value = String(condition || "").toLowerCase();
-  if (/thunder|storm/.test(value)) return "⛈️";
-  if (/snow|sleet|blizzard|ice/.test(value)) return "❄️";
-  if (/rain|drizzle|shower/.test(value)) return "🌧️";
-  if (/mist|fog|haze/.test(value)) return "🌫️";
-  if (/cloud|overcast/.test(value)) return "☁️";
-  if (/partly/.test(value)) return "⛅";
-  if (/clear|sunny/.test(value)) return "☀️";
+  if (/thunder|storm|гроз/.test(value)) return "⛈️";
+  if (/snow|sleet|blizzard|ice|снег|метел|лед/.test(value)) return "❄️";
+  if (/rain|drizzle|shower|дожд|морос/.test(value)) return "🌧️";
+  if (/mist|fog|haze|туман/.test(value)) return "🌫️";
+  if (/cloud|overcast|облач|пасмур/.test(value)) return "☁️";
+  if (/partly|перемен/.test(value)) return "⛅";
+  if (/clear|sunny|ясно|солнеч/.test(value)) return "☀️";
   return "🌤️";
 }
 
@@ -370,7 +374,6 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
    *   windInMps: Whether wind should be shown in m/s.
    *   acceptLanguage: Optional `Accept-Language` header.
    *   days: Forecast day count.
-   *   nativeSite: If true, use wttr site-native localized text output.
    *
    * Returns:
    *   Normalized summary payload with text and structured fields.
@@ -378,34 +381,7 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
    * Throws:
    *   Error: If upstream request/parsing fails.
    */
-  async render({ location, lang, units, windInMps, acceptLanguage, days, nativeSite }) {
-    if (nativeSite) {
-      const siteMode = "3";
-      const nativeUrl = this.wttrClient.buildUrl({
-        path: location,
-        query: siteMode,
-        lang,
-        units,
-        windInMps,
-      });
-      const { text, contentType } = await this.wttrClient.fetchText(nativeUrl, { acceptLanguage });
-
-      return {
-        view: this.id,
-        outputType: "text",
-        contentType,
-        urls: [nativeUrl],
-        text: text.trim(),
-        current: null,
-        forecast: [],
-        place: location,
-        requestedLocation: location,
-        resolvedPlace: null,
-        locale: resolveLocale({ lang, acceptLanguage }),
-        nativeSite: true,
-      };
-    }
-
+  async render({ location, lang, units, windInMps, acceptLanguage, days }) {
     const url = this.wttrClient.buildUrl({
       path: location,
       query: "format=j1",
@@ -417,10 +393,13 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
     // Step 1: fetch canonical JSON payload from wttr API.
     const { json: apiData, contentType } = await this.wttrClient.fetchJson(url, { acceptLanguage });
 
+    const langCode = resolveLangCode({ lang, acceptLanguage });
+
     // Step 2: parse to domain DTOs so upper layers do not depend on raw wttr keys.
-    const current = parseCurrentFromApi(apiData);
+    // JSON parser now prefers wttr localized condition fields (for example lang_ru).
+    const current = parseCurrentFromApi(apiData, { langCode });
     const nearest = apiData?.nearest_area?.[0] || null;
-    const forecast = parseForecastFromApi(apiData, days);
+    const forecast = parseForecastFromApi(apiData, days, { langCode });
 
     // Step 3: derive user-facing place label from nearest area metadata.
     const areaName = nearest?.areaName?.[0]?.value || location;
@@ -696,7 +675,6 @@ export class WeatherViewService {
       acceptLanguage: args.acceptLanguage,
       days,
       ansi: selected.ansi,
-      nativeSite: Boolean(args.nativeSite),
     });
 
     // Phase D: emit a normalized envelope shared by all view strategies.

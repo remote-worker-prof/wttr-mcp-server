@@ -17,6 +17,7 @@ const SAMPLE_API = {
       pressure: "1008",
       uvIndex: "1",
       weatherDesc: [{ value: "Cloudy" }],
+      lang_ru: [{ value: "Облачно" }],
       precipMM: "0.1",
       cloudcover: "80",
     },
@@ -51,6 +52,7 @@ const SAMPLE_API = {
           windspeedKmph: "20",
           winddir16Point: "NW",
           weatherDesc: [{ value: "Light rain" }],
+          lang_ru: [{ value: "Небольшой дождь" }],
         },
       ],
     },
@@ -113,22 +115,6 @@ test("ru locale applies russian labels and translated condition", async () => {
   assert.match(result.text, /📍 Локация:/);
   assert.match(result.text, /☁️ Сейчас: Облачно/);
   assert.match(result.text, /📅 Прогноз/);
-});
-
-test("nativeSite mode returns wttr site-localized text", async () => {
-  const service = createWeatherViewService({ wttrClient: new MockWttrClient() });
-  const result = await service.render({
-    location: "Санкт-Петербург",
-    agent: "openclaw",
-    days: 2,
-    lang: "ru",
-    nativeSite: true,
-  });
-
-  assert.equal(result.nativeSite, true);
-  assert.match(result.text, /Погода: Санкт-Петербург/);
-  assert.equal(result.current, null);
-  assert.equal(result.forecast.length, 0);
 });
 
 test("codex profile defaults to ascii_compact without ANSI", async () => {

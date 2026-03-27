@@ -190,12 +190,6 @@ function createWeatherViewTool({ weatherViewService }) {
         units: { type: "string", enum: UNITS, default: "auto" },
         windInMps: { type: "boolean", default: false },
         acceptLanguage: { type: "string", description: "Optional Accept-Language header" },
-        nativeSite: {
-          type: "boolean",
-          default: false,
-          description:
-            "Use wttr site-native localized text output for normal view (leverages built-in multilingual formatting).",
-        },
       },
       required: ["location"],
     },
