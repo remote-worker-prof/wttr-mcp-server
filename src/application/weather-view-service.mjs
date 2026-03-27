@@ -370,6 +370,7 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
    *   windInMps: Whether wind should be shown in m/s.
    *   acceptLanguage: Optional `Accept-Language` header.
    *   days: Forecast day count.
+   *   nativeSite: If true, use wttr site-native localized text output.
    *
    * Returns:
    *   Normalized summary payload with text and structured fields.
@@ -377,7 +378,34 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
    * Throws:
    *   Error: If upstream request/parsing fails.
    */
-  async render({ location, lang, units, windInMps, acceptLanguage, days }) {
+  async render({ location, lang, units, windInMps, acceptLanguage, days, nativeSite }) {
+    if (nativeSite) {
+      const siteMode = "3";
+      const nativeUrl = this.wttrClient.buildUrl({
+        path: location,
+        query: siteMode,
+        lang,
+        units,
+        windInMps,
+      });
+      const { text, contentType } = await this.wttrClient.fetchText(nativeUrl, { acceptLanguage });
+
+      return {
+        view: this.id,
+        outputType: "text",
+        contentType,
+        urls: [nativeUrl],
+        text: text.trim(),
+        current: null,
+        forecast: [],
+        place: location,
+        requestedLocation: location,
+        resolvedPlace: null,
+        locale: resolveLocale({ lang, acceptLanguage }),
+        nativeSite: true,
+      };
+    }
+
     const url = this.wttrClient.buildUrl({
       path: location,
       query: "format=j1",
@@ -668,6 +696,7 @@ export class WeatherViewService {
       acceptLanguage: args.acceptLanguage,
       days,
       ansi: selected.ansi,
+      nativeSite: Boolean(args.nativeSite),
     });
 
     // Phase D: emit a normalized envelope shared by all view strategies.

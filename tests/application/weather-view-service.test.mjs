@@ -69,7 +69,7 @@ class MockWttrClient {
   async fetchText(url) {
     if (url.includes("?3")) {
       return {
-        text: "\u001b[38;5;39mCloudy\u001b[0m\n+1°C\nWind: 18 km/h",
+        text: "🌤️ Погода: Санкт-Петербург\n+1°C\nОщущается как -1°C",
         contentType: "text/plain",
       };
     }
@@ -113,6 +113,22 @@ test("ru locale applies russian labels and translated condition", async () => {
   assert.match(result.text, /📍 Локация:/);
   assert.match(result.text, /☁️ Сейчас: Облачно/);
   assert.match(result.text, /📅 Прогноз/);
+});
+
+test("nativeSite mode returns wttr site-localized text", async () => {
+  const service = createWeatherViewService({ wttrClient: new MockWttrClient() });
+  const result = await service.render({
+    location: "Санкт-Петербург",
+    agent: "openclaw",
+    days: 2,
+    lang: "ru",
+    nativeSite: true,
+  });
+
+  assert.equal(result.nativeSite, true);
+  assert.match(result.text, /Погода: Санкт-Петербург/);
+  assert.equal(result.current, null);
+  assert.equal(result.forecast.length, 0);
 });
 
 test("codex profile defaults to ascii_compact without ANSI", async () => {
