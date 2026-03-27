@@ -1,94 +1,93 @@
 # wttr-mcp-server
 
-`wttr-mcp-server` is a Model Context Protocol (MCP) server for `wttr.in`.
-It supports both human-readable weather output and structured JSON output,
-with compatibility-focused behavior for chat UIs and workflow agents.
+`wttr-mcp-server` is a small MCP server for `wttr.in`.
+It can return plain weather text, structured JSON, or base64-encoded PNG payloads,
+depending on which tool you call.
 
-## Key capabilities
+The project is built for day-to-day use in editor agents, chat UIs, and workflow systems.
 
-- `wttr_weather_view` for user-facing weather summaries and ASCII variants.
-- `wttr_site_weather` for direct wttr format modes (`0`, `1`, `2`, `3`, `v2`, `0pq`, `%...`).
-- `wttr_raw_request` for full wttr endpoint access, including special paths and PNG output.
-- `wttr_api_current` and `wttr_api_forecast` for structured JSON weather data.
-- `wttr_help` for complete `wttr.in/:help` output.
+## what it does
 
-## Compatibility profiles
+- `wttr_weather_view` — readable weather summaries plus ASCII views.
+- `wttr_site_weather` — direct wttr mode output (`0`, `1`, `2`, `3`, `v2`, `0pq`, `%...`).
+- `wttr_raw_request` — raw endpoint access, including special paths and PNG output.
+- `wttr_api_current` — structured current conditions.
+- `wttr_api_forecast` — structured forecast data.
+- `wttr_help` — full `wttr.in/:help` output.
 
-The server now supports result presentation profiles optimized for different MCP hosts:
+## result profiles
 
-- `default`: readable JSON text + `structuredContent` when available.
-- `webchat`: prefers plain weather text in `content[0].text`, keeps `structuredContent`.
-- `n8n`: emits compact JSON text in `content[0].text`, keeps `structuredContent`.
+MCP clients don’t always treat responses the same way, so the server supports three presentation profiles:
 
-Profile selection:
+- `default`
+- `webchat`
+- `n8n`
 
-1. Request metadata (`params._meta.resultProfile` or `params._meta.clientProfile`).
-2. Environment variable `WTTR_MCP_RESULT_PROFILE`.
-3. Fallback to `default`.
+Profile resolution order:
 
-This improves interoperability in clients that flatten or transform tool responses.
+1. request metadata (`params._meta.resultProfile` or `params._meta.clientProfile`)
+2. environment variable `WTTR_MCP_RESULT_PROFILE`
+3. fallback to `default`
 
-## Weather output profiles
+## weather view profiles
 
-`wttr_weather_view` supports agent-specific defaults:
+`wttr_weather_view` has agent-oriented defaults:
 
-- Summary-first profiles: `auto`, `openclaw`, `webchat`, `browser`, `n8n`, `claude`.
-- ASCII-compact profiles: `codex`, `cursor`, `cline`, `windsurf`.
-- Full terminal profile: `terminal` (ANSI enabled by default).
+- summary-first: `auto`, `openclaw`, `webchat`, `browser`, `n8n`, `claude`
+- compact ASCII: `codex`, `cursor`, `cline`, `windsurf`
+- terminal ASCII with ANSI by default: `terminal`
 
-Views:
+Available views:
 
 - `normal`
 - `ascii_compact`
 - `ascii_full`
 - `ascii_one_line`
 
-## Quick start
+## quick start
 
 ```bash
 npm install
 npm start
 ```
 
-## Example MCP calls
+## local examples
 
 ```bash
-# Summary output for OpenClaw/WebChat style usage
+# readable summary
 mcporter call wttr-mcp.wttr_weather_view \
   --args '{"location":"Saint Petersburg","agent":"webchat","lang":"ru"}'
 
-# ASCII compact for coding agents
+# compact ASCII output
 mcporter call wttr-mcp.wttr_weather_view \
   --args '{"location":"Saint Petersburg","agent":"codex","lang":"ru"}'
 
-# Full ASCII with ANSI colors
-mcporter call wttr-mcp.wttr_weather_view \
-  --args '{"location":"Saint Petersburg","agent":"terminal","lang":"ru","ansi":true}'
-
-# Structured current weather
+# structured current weather
 mcporter call wttr-mcp.wttr_api_current \
   --args '{"location":"Saint Petersburg","lang":"ru"}'
 ```
 
-## Quality checks
+## quality checks
 
 ```bash
-npm run check:docs   # Enforces Args/Returns/Throws docblocks on exported entities
+npm run check:docs   # exported entities must have Args/Returns/Throws docblocks
 npm test
 npm run smoke
-npm run ci           # check:docs + unit tests (same as CI pipeline)
+npm run ci           # check:docs + unit tests
 ```
 
-Or with Makefile shortcuts:
+Makefile equivalents:
 
 ```bash
+make check-docs
 make test
+make ci
 make smoke
 ```
 
-## Installation helpers
+## install helpers
 
-The repository provides installers for common MCP hosts.
+The repository includes installer scripts and Make targets for common MCP hosts.
 
 ```bash
 make install-openclaw-source
@@ -100,7 +99,7 @@ make install-windsurf-source
 make install-codex-source
 ```
 
-Remote HTTP installation helpers:
+Remote HTTP variants:
 
 ```bash
 make install-cursor-http HTTP_URL=https://host.example/mcp
@@ -116,30 +115,29 @@ make install-generic-docker CONFIG=~/.config/Claude/claude_desktop_config.json R
 make install-generic-http CONFIG=~/.codeium/windsurf/mcp_config.json ROOT_KEY=mcpServers HTTP_URL=https://host.example/mcp
 ```
 
-## Docker
+## docker
 
 ```bash
 docker build -t markstroinyi/wttr-mcp-server:0.3.0 .
 docker run --rm -i markstroinyi/wttr-mcp-server:0.3.0
 ```
 
-## Architecture overview
+## architecture in short
 
-- `src/domain`: validation and weather data parsing.
-- `src/infrastructure`: wttr HTTP adapter.
-- `src/application`: tool registry and weather view orchestration.
-- `src/presentation`: MCP server wiring and result presentation strategies.
+- `src/domain` — validation and API parsing.
+- `src/infrastructure` — upstream wttr HTTP adapter.
+- `src/application` — tool registry and weather rendering flow.
+- `src/presentation` — MCP server wiring and result presentation policy.
 
-Patterns in use:
+Patterns used in production code:
 
-- Command pattern for tool execution.
-- Adapter pattern for upstream HTTP interaction.
-- Strategy + Factory for weather view rendering.
-- Strategy + Factory for MCP result presentation profiles.
-- Composition root in MCP server bootstrap.
+- command
+- adapter
+- strategy + factory
+- composition root
 
-See `docs/architecture.md`, `docs/client-compatibility-research.md`, and `docs/practical-launch-targets.md` for details.
+For a full walkthrough, see `docs/architecture.md` and `docs/practical-launch-targets.md`.
 
-## License
+## license
 
 MIT
