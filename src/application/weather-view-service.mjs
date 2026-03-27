@@ -15,6 +15,51 @@ import { requireEnum, requireIntInRange, requireString } from "../domain/validat
  */
 const UNITS = ["auto", "metric", "us"];
 
+const LABELS = Object.freeze({
+  en: {
+    location: "Location",
+    nearestArea: "nearest area",
+    now: "Now",
+    feelsLike: "feels",
+    humidity: "Humidity",
+    wind: "Wind",
+    pressure: "Pressure",
+    forecast: "Forecast",
+    day: "day",
+    days: "days",
+    rainUpTo: "rain up to",
+    unknownCondition: "n/a",
+  },
+  ru: {
+    location: "Локация",
+    nearestArea: "ближайшая зона",
+    now: "Сейчас",
+    feelsLike: "ощущается как",
+    humidity: "Влажность",
+    wind: "Ветер",
+    pressure: "Давление",
+    forecast: "Прогноз",
+    day: "день",
+    days: "дня",
+    rainUpTo: "осадки до",
+    unknownCondition: "нет данных",
+  },
+});
+
+const CONDITION_TRANSLATIONS_RU = Object.freeze({
+  clear: "Ясно",
+  sunny: "Солнечно",
+  "partly cloudy": "Переменная облачность",
+  cloudy: "Облачно",
+  overcast: "Пасмурно",
+  mist: "Туман",
+  fog: "Туман",
+  rain: "Дождь",
+  drizzle: "Морось",
+  snow: "Снег",
+  thunder: "Гроза",
+});
+
 /**
  * Declares the supported weather rendering views.
  *
@@ -119,6 +164,123 @@ function stripAnsi(text) {
 function safeNumber(value) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+/**
+ * Resolves output locale from lang and Accept-Language hints.
+ *
+ * Args:
+ *   lang: Optional explicit language parameter.
+ *   acceptLanguage: Optional Accept-Language header value.
+ *
+ * Returns:
+ *   Locale key supported by local label dictionaries.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function resolveLocale({ lang, acceptLanguage }) {
+  const candidate = (lang || acceptLanguage || "").toLowerCase();
+  return candidate.startsWith("ru") ? "ru" : "en";
+}
+
+/**
+ * Picks a weather emoji for condition text.
+ *
+ * Args:
+ *   condition: Raw weather condition text.
+ *
+ * Returns:
+ *   Emoji string matching the condition.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function pickConditionEmoji(condition) {
+  const value = String(condition || "").toLowerCase();
+  if (/thunder|storm/.test(value)) return "⛈️";
+  if (/snow|sleet|blizzard|ice/.test(value)) return "❄️";
+  if (/rain|drizzle|shower/.test(value)) return "🌧️";
+  if (/mist|fog|haze/.test(value)) return "🌫️";
+  if (/cloud|overcast/.test(value)) return "☁️";
+  if (/partly/.test(value)) return "⛅";
+  if (/clear|sunny/.test(value)) return "☀️";
+  return "🌤️";
+}
+
+/**
+ * Localizes condition text for the selected locale.
+ *
+ * Args:
+ *   condition: Raw weather condition text.
+ *   locale: Selected output locale.
+ *
+ * Returns:
+ *   Localized condition label.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function localizeCondition(condition, locale) {
+  const normalized = String(condition || "").trim();
+  if (!normalized) return LABELS[locale].unknownCondition;
+
+  if (locale !== "ru") {
+    return normalized;
+  }
+
+  const lower = normalized.toLowerCase();
+  for (const [token, translated] of Object.entries(CONDITION_TRANSLATIONS_RU)) {
+    if (lower.includes(token)) {
+      return translated;
+    }
+  }
+
+  return normalized;
+}
+
+/**
+ * Compares two location strings loosely.
+ *
+ * Args:
+ *   left: First location value.
+ *   right: Second location value.
+ *
+ * Returns:
+ *   True when values are effectively the same location label.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function isSameLocation(left, right) {
+  const normalize = (value) => String(value || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+  const leftNormalized = normalize(left);
+  const rightNormalized = normalize(right);
+  if (!leftNormalized || !rightNormalized) return false;
+  return leftNormalized === rightNormalized;
+}
+
+/**
+ * Builds location line with requested and resolved labels.
+ *
+ * Args:
+ *   requestedLocation: User-requested location.
+ *   resolvedPlace: Place from wttr nearest-area metadata.
+ *   locale: Selected output locale.
+ *
+ * Returns:
+ *   Human-readable location line.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally.
+ */
+function formatLocationLine({ requestedLocation, resolvedPlace, locale }) {
+  if (!requestedLocation) return resolvedPlace;
+  if (!resolvedPlace) return requestedLocation;
+  if (isSameLocation(requestedLocation, resolvedPlace)) return resolvedPlace;
+
+  const labels = LABELS[locale];
+  return `${requestedLocation} (${labels.nearestArea}: ${resolvedPlace})`;
 }
 
 /**
@@ -237,26 +399,33 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
     const country = nearest?.country?.[0]?.value || "";
     const place = country ? `${areaName}, ${country}` : areaName;
 
+    const locale = resolveLocale({ lang, acceptLanguage });
+    const labels = LABELS[locale];
+
     const windValue = windInMps
       ? `${Math.round((safeNumber(current.windKmph) || 0) / 3.6)} m/s`
       : `${current.windKmph} km/h`;
 
-    // Step 4: assemble a narrative summary with fixed line semantics.
-    // Keeping line order stable is important for clients that diff text output.
+    const nowCondition = localizeCondition(current.condition, locale);
+    const nowEmoji = pickConditionEmoji(current.condition);
+
+    // Step 4: assemble a narrative summary with stable, human-readable semantics.
     const lines = [
-      `Weather: ${place}`,
-      `Now: ${current.condition}, ${current.temperatureC}°C (feels ${current.feelsLikeC}°C)`,
-      `Humidity: ${current.humidity}% | Wind: ${current.windDirection} ${windValue} | Pressure: ${current.pressure} hPa`,
+      `📍 ${labels.location}: ${formatLocationLine({ requestedLocation: location, resolvedPlace: place, locale })}`,
+      `${nowEmoji} ${labels.now}: ${nowCondition}, ${current.temperatureC}°C (${labels.feelsLike} ${current.feelsLikeC}°C)`,
+      `💧 ${labels.humidity}: ${current.humidity}% | 💨 ${labels.wind}: ${current.windDirection} ${windValue} | 🧭 ${labels.pressure}: ${current.pressure} hPa`,
       "",
-      `Forecast (${forecast.length} day${forecast.length === 1 ? "" : "s"}):`,
+      `📅 ${labels.forecast} (${forecast.length} ${forecast.length === 1 ? labels.day : labels.days}):`,
     ];
 
     // Extract peak rain probability so the summary keeps worst-case risk visible.
     for (const day of forecast) {
       const midday = day.hourly?.find((hourlyEntry) => hourlyEntry.time === "1200") || day.hourly?.[0] || null;
       const maxRain = Math.max(...(day.hourly || []).map((hourlyEntry) => safeNumber(hourlyEntry.chanceOfRain) || 0));
+      const middayCondition = localizeCondition(midday?.condition, locale);
+      const middayEmoji = pickConditionEmoji(midday?.condition);
       lines.push(
-        `- ${day.date}: ${day.minTempC}..${day.maxTempC}°C, ${midday?.condition || "n/a"}, rain up to ${maxRain}%`,
+        `• ${day.date}: ${day.minTempC}..${day.maxTempC}°C, ${middayEmoji} ${middayCondition}, ${labels.rainUpTo} ${maxRain}%`,
       );
     }
 
@@ -269,6 +438,9 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
       current,
       forecast,
       place,
+      requestedLocation: location,
+      resolvedPlace: place,
+      locale,
     };
   }
 }

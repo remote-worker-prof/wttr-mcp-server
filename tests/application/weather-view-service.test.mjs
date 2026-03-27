@@ -23,7 +23,7 @@ const SAMPLE_API = {
   ],
   nearest_area: [
     {
-      areaName: [{ value: "Saint Petersburg" }],
+      areaName: [{ value: "New Holland" }],
       country: [{ value: "Russia" }],
     },
   ],
@@ -86,16 +86,33 @@ test("factory returns WeatherViewService instance", () => {
   assert.equal(service instanceof WeatherViewService, true);
 });
 
-test("normal view returns structured summary payload", async () => {
+test("normal view returns localized, emoji-rich summary payload", async () => {
   const service = createWeatherViewService({ wttrClient: new MockWttrClient() });
   const result = await service.render({ location: "Saint Petersburg", agent: "openclaw", days: 1 });
 
   assert.equal(result.ok, true);
   assert.equal(result.view, "normal");
-  assert.match(result.text, /Weather: Saint Petersburg, Russia/);
-  assert.match(result.text, /Forecast/);
+  assert.match(result.text, /📍 Location: Saint Petersburg \(nearest area: New Holland, Russia\)/);
+  assert.match(result.text, /📅 Forecast/);
+  assert.match(result.text, /☁️ Now: Cloudy/);
   assert.equal(result.current.condition, "Cloudy");
   assert.equal(result.forecast.length, 1);
+  assert.equal(result.locale, "en");
+});
+
+test("ru locale applies russian labels and translated condition", async () => {
+  const service = createWeatherViewService({ wttrClient: new MockWttrClient() });
+  const result = await service.render({
+    location: "Санкт-Петербург",
+    agent: "openclaw",
+    days: 1,
+    lang: "ru",
+  });
+
+  assert.equal(result.locale, "ru");
+  assert.match(result.text, /📍 Локация:/);
+  assert.match(result.text, /☁️ Сейчас: Облачно/);
+  assert.match(result.text, /📅 Прогноз/);
 });
 
 test("codex profile defaults to ascii_compact without ANSI", async () => {
