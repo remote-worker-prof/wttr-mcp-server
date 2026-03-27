@@ -1,166 +1,145 @@
-# 🌦️ wttr-mcp-server
+# wttr-mcp-server
 
-A practical MCP server for [wttr.in](https://wttr.in) that works with both:
-- the classic text-style weather output,
-- and the JSON API (`format=j1`).
+`wttr-mcp-server` is a Model Context Protocol (MCP) server for `wttr.in`.
+It supports both human-readable weather output and structured JSON output,
+with compatibility-focused behavior for chat UIs and workflow agents.
 
-If you want weather tools that are easy to wire into agents, this repo is for you.
+## Key capabilities
 
----
+- `wttr_weather_view` for user-facing weather summaries and ASCII variants.
+- `wttr_site_weather` for direct wttr format modes (`0`, `1`, `2`, `3`, `v2`, `0pq`, `%...`).
+- `wttr_raw_request` for full wttr endpoint access, including special paths and PNG output.
+- `wttr_api_current` and `wttr_api_forecast` for structured JSON weather data.
+- `wttr_help` for complete `wttr.in/:help` output.
 
-## ✨ What you get
+## Compatibility profiles
 
-- `wttr_weather_view` → human-friendly weather output with agent profiles (`openclaw`, `codex`, `cursor`, `terminal`) and ASCII variants
-- `wttr_site_weather` → quick weather view (`3/0/1/2/v2/0pq` or custom `%...` format)
-- `wttr_raw_request` → raw access to wttr endpoints (moon, PNG, special URLs, combined options)
-- `wttr_api_current` → structured current weather from `format=j1`
-- `wttr_api_forecast` → structured 1-3 day forecast from `format=j1`
-- `wttr_help` → full `wttr.in/:help`
+The server now supports result presentation profiles optimized for different MCP hosts:
 
----
+- `default`: readable JSON text + `structuredContent` when available.
+- `webchat`: prefers plain weather text in `content[0].text`, keeps `structuredContent`.
+- `n8n`: emits compact JSON text in `content[0].text`, keeps `structuredContent`.
 
-## 🚀 Quick start
+Profile selection:
+
+1. Request metadata (`params._meta.resultProfile` or `params._meta.clientProfile`).
+2. Environment variable `WTTR_MCP_RESULT_PROFILE`.
+3. Fallback to `default`.
+
+This improves interoperability in clients that flatten or transform tool responses.
+
+## Weather output profiles
+
+`wttr_weather_view` supports agent-specific defaults:
+
+- Summary-first profiles: `auto`, `openclaw`, `webchat`, `browser`, `n8n`, `claude`.
+- ASCII-compact profiles: `codex`, `cursor`, `cline`, `windsurf`.
+- Full terminal profile: `terminal` (ANSI enabled by default).
+
+Views:
+
+- `normal`
+- `ascii_compact`
+- `ascii_full`
+- `ascii_one_line`
+
+## Quick start
 
 ```bash
 npm install
 npm start
 ```
 
----
-
-## 🧭 "Normal" vs ASCII output through MCP
-
-Use `wttr_weather_view` when you want readable output without digging into raw JSON.
-
-Examples:
-- **Normal summary**: `agent=openclaw` (default: clean text, no ANSI)
-- **ASCII for Codex/Cursor/Cline**: `agent=codex` or `agent=cursor`
-- **Terminal full ASCII with colors**: `agent=terminal` or `view=ascii_full&ansi=true`
-- **Force one-line output**: `view=ascii_one_line`
-
-You can still call low-level tools (`wttr_api_current`, `wttr_site_weather`, `wttr_raw_request`) when you need full control.
-
-## 🧪 Smoke test
+## Example MCP calls
 
 ```bash
-npm run smoke
-# or
-make smoke
+# Summary output for OpenClaw/WebChat style usage
+mcporter call wttr-mcp.wttr_weather_view \
+  --args '{"location":"Saint Petersburg","agent":"webchat","lang":"ru"}'
+
+# ASCII compact for coding agents
+mcporter call wttr-mcp.wttr_weather_view \
+  --args '{"location":"Saint Petersburg","agent":"codex","lang":"ru"}'
+
+# Full ASCII with ANSI colors
+mcporter call wttr-mcp.wttr_weather_view \
+  --args '{"location":"Saint Petersburg","agent":"terminal","lang":"ru","ansi":true}'
+
+# Structured current weather
+mcporter call wttr-mcp.wttr_api_current \
+  --args '{"location":"Saint Petersburg","lang":"ru"}'
 ```
 
-This runs local stdio checks via `mcporter --stdio` and verifies the key tool paths.
-
----
-
-## 🛠️ Makefile shortcuts
+## Quality checks
 
 ```bash
-make help
-make install-deps
+npm run check:docs   # Enforces Args/Returns/Throws docblocks on exported entities
+npm test
+npm run smoke
+npm run ci           # check:docs + unit tests (same as CI pipeline)
+```
+
+Or with Makefile shortcuts:
+
+```bash
 make test
 make smoke
-make docker-build
-make docker-push
 ```
 
----
+## Installation helpers
 
-## 🐳 Docker
+The repository provides installers for common MCP hosts.
 
-Docker Hub page:
-- https://hub.docker.com/r/markstroinyi/wttr-mcp-server
+```bash
+make install-openclaw-source
+make install-claude-linux-source
+make install-claude-mac-source
+make install-cursor-source
+make install-cline-vscode-source
+make install-windsurf-source
+make install-codex-source
+```
 
-Build and run locally:
+Remote HTTP installation helpers:
+
+```bash
+make install-cursor-http HTTP_URL=https://host.example/mcp
+make install-windsurf-http HTTP_URL=https://host.example/mcp
+make install-codex-http HTTP_URL=https://host.example/mcp BEARER_TOKEN_ENV_VAR=WTTR_TOKEN
+```
+
+Generic installers:
+
+```bash
+make install-generic-source CONFIG=~/.cursor/mcp.json ROOT_KEY=mcpServers
+make install-generic-docker CONFIG=~/.config/Claude/claude_desktop_config.json ROOT_KEY=mcpServers
+make install-generic-http CONFIG=~/.codeium/windsurf/mcp_config.json ROOT_KEY=mcpServers HTTP_URL=https://host.example/mcp
+```
+
+## Docker
 
 ```bash
 docker build -t markstroinyi/wttr-mcp-server:0.3.0 .
 docker run --rm -i markstroinyi/wttr-mcp-server:0.3.0
 ```
 
----
+## Architecture overview
 
-## 🤖 MCP config examples
+- `src/domain`: validation and weather data parsing.
+- `src/infrastructure`: wttr HTTP adapter.
+- `src/application`: tool registry and weather view orchestration.
+- `src/presentation`: MCP server wiring and result presentation strategies.
 
-### Source mode (local project)
+Patterns in use:
 
-```json
-{
-  "mcpServers": {
-    "wttr-mcp": {
-      "command": "node",
-      "args": ["/home/sorcerer/Projects/wttr-mcp-server/src/index.mjs"]
-    }
-  }
-}
-```
+- Command pattern for tool execution.
+- Adapter pattern for upstream HTTP interaction.
+- Strategy + Factory for weather view rendering.
+- Strategy + Factory for MCP result presentation profiles.
+- Composition root in MCP server bootstrap.
 
-### Docker mode
+See `docs/architecture.md`, `docs/client-compatibility-research.md`, and `docs/practical-launch-targets.md` for details.
 
-```json
-{
-  "mcpServers": {
-    "wttr-mcp": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "markstroinyi/wttr-mcp-server:latest"]
-    }
-  }
-}
-```
-
----
-
-## ⚙️ One-command install for popular AI agents
-
-```bash
-# OpenClaw / mcporter
-make install-openclaw-source
-
-# Claude Desktop (Linux)
-make install-claude-linux-source
-
-# Claude Desktop (macOS)
-make install-claude-mac-source
-
-# Cursor
-make install-cursor-source
-
-# VS Code + Cline (writes cline.mcpServers in settings.json)
-make install-cline-vscode-source
-
-# Windsurf
-make install-windsurf-source
-
-# Codex CLI (~/.codex/config.toml)
-make install-codex-source
-```
-
-Custom config targets:
-
-```bash
-make install-generic-source CONFIG=~/.cursor/mcp.json ROOT_KEY=mcpServers
-make install-generic-docker CONFIG=~/.config/Claude/claude_desktop_config.json ROOT_KEY=mcpServers
-```
-
-For Codex, the installer writes a TOML section like:
-`[mcp_servers.<name>]` in `~/.codex/config.toml`.
-
----
-
-## 🧱 Architecture (kept simple on purpose)
-
-- `src/domain/*` → pure logic (validation, parsers)
-- `src/infrastructure/*` → wttr adapter (`WttrClient`)
-- `src/application/*` → tool registry and command execution
-- `src/presentation/*` → MCP transport wiring
-
-Patterns used:
-- Command
-- Adapter
-- Composition root
-- Layered structure (Fowler-style separation)
-
----
-
-## 📄 License
+## License
 
 MIT

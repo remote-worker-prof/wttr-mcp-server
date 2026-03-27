@@ -10,8 +10,10 @@
   },
   "scripts": {
     "start": "node src/index.mjs",
+    "check:docs": "node scripts/check_export_docs.mjs",
     "test": "node --test",
-    "smoke": "python3 scripts/smoke.py"
+    "smoke": "python3 scripts/smoke.py",
+    "ci": "npm run check:docs && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1"

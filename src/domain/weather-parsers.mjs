@@ -1,3 +1,15 @@
+/**
+ * Parses current weather conditions from wttr JSON API payload.
+ *
+ * Args:
+ *   apiData: Raw JSON payload from wttr `format=j1` endpoint.
+ *
+ * Returns:
+ *   Normalized object with current weather attributes.
+ *
+ * Throws:
+ *   Error: If `current_condition` is missing.
+ */
 export function parseCurrentFromApi(apiData) {
   const current = apiData?.current_condition?.[0];
   if (!current) {
@@ -22,7 +34,21 @@ export function parseCurrentFromApi(apiData) {
   };
 }
 
+/**
+ * Parses forecast entries from wttr JSON API payload.
+ *
+ * Args:
+ *   apiData: Raw JSON payload from wttr `format=j1` endpoint.
+ *   days: Number of forecast days to keep (1..3).
+ *
+ * Returns:
+ *   List of normalized forecast-day objects.
+ *
+ * Throws:
+ *   Error: Never thrown intentionally; returns empty list for missing forecast sections.
+ */
 export function parseForecastFromApi(apiData, days) {
+  // Slice first, then map, so consumers receive deterministic day count.
   const weatherDays = Array.isArray(apiData?.weather) ? apiData.weather.slice(0, days) : [];
 
   return weatherDays.map((day) => ({
@@ -35,18 +61,18 @@ export function parseForecastFromApi(apiData, days) {
     avgTempF: day.avgtempF,
     uvIndex: day.uvIndex,
     astronomy: day.astronomy?.[0] || null,
-    hourly: (day.hourly || []).map((h) => ({
-      time: h.time,
-      tempC: h.tempC,
-      tempF: h.tempF,
-      feelsLikeC: h.FeelsLikeC,
-      feelsLikeF: h.FeelsLikeF,
-      humidity: h.humidity,
-      chanceOfRain: h.chanceofrain,
-      chanceOfSnow: h.chanceofsnow,
-      windKmph: h.windspeedKmph,
-      windDir: h.winddir16Point,
-      condition: h.weatherDesc?.[0]?.value,
+    hourly: (day.hourly || []).map((hourlyEntry) => ({
+      time: hourlyEntry.time,
+      tempC: hourlyEntry.tempC,
+      tempF: hourlyEntry.tempF,
+      feelsLikeC: hourlyEntry.FeelsLikeC,
+      feelsLikeF: hourlyEntry.FeelsLikeF,
+      humidity: hourlyEntry.humidity,
+      chanceOfRain: hourlyEntry.chanceofrain,
+      chanceOfSnow: hourlyEntry.chanceofsnow,
+      windKmph: hourlyEntry.windspeedKmph,
+      windDir: hourlyEntry.winddir16Point,
+      condition: hourlyEntry.weatherDesc?.[0]?.value,
     })),
   }));
 }
