@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "WTTR",
+  "project_id": "7731125c-7fcc-44cf-8a63-d4989d0dfdb5"
+}
