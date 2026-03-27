@@ -32,6 +32,24 @@ npm install
 npm start
 ```
 
+## Smoke test (local stdio)
+
+```bash
+npm run smoke
+# or
+make smoke
+```
+
+## Makefile quickstart
+
+```bash
+make help
+make install-deps
+make test
+make smoke
+make docker-build
+```
+
 ## Docker
 
 ```bash
@@ -65,6 +83,35 @@ docker run --rm -i markstroinyi/wttr-mcp-server:0.3.0
     }
   }
 }
+```
+
+## One-command install for popular AI agents
+
+```bash
+# OpenClaw / mcporter config
+make install-openclaw-source
+
+# Claude Desktop (Linux)
+make install-claude-linux-source
+
+# Claude Desktop (macOS)
+make install-claude-mac-source
+
+# Cursor
+make install-cursor-source
+
+# VS Code + Cline (writes cline.mcpServers in settings.json)
+make install-cline-vscode-source
+
+# Windsurf
+make install-windsurf-source
+```
+
+You can also install into any custom JSON config:
+
+```bash
+make install-generic-source CONFIG=~/.cursor/mcp.json ROOT_KEY=mcpServers
+make install-generic-docker CONFIG=~/.config/Claude/claude_desktop_config.json ROOT_KEY=mcpServers
 ```
 
 ## License

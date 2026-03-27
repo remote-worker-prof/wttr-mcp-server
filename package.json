@@ -10,7 +10,8 @@
   },
   "scripts": {
     "start": "node src/index.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "smoke": "python3 scripts/smoke.py"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1"
