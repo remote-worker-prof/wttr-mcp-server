@@ -11,6 +11,7 @@
  *   Error: If `current_condition` is missing.
  */
 export function parseCurrentFromApi(apiData) {
+  // wttr keeps current conditions as a single-element array.
   const current = apiData?.current_condition?.[0];
   if (!current) {
     throw new Error("wttr API response missing current_condition");
@@ -52,6 +53,7 @@ export function parseForecastFromApi(apiData, days) {
   const weatherDays = Array.isArray(apiData?.weather) ? apiData.weather.slice(0, days) : [];
 
   return weatherDays.map((day) => ({
+    // Flatten top-level daily metrics first.
     date: day.date,
     maxTempC: day.maxtempC,
     minTempC: day.mintempC,
@@ -61,6 +63,7 @@ export function parseForecastFromApi(apiData, days) {
     avgTempF: day.avgtempF,
     uvIndex: day.uvIndex,
     astronomy: day.astronomy?.[0] || null,
+    // Convert each hourly snapshot into stable camelCase fields.
     hourly: (day.hourly || []).map((hourlyEntry) => ({
       time: hourlyEntry.time,
       tempC: hourlyEntry.tempC,

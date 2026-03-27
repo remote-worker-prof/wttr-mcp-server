@@ -75,8 +75,10 @@ export function createWttrMcpServer() {
 
   const server = new Server({ name: SERVER_NAME, version: SERVER_VERSION }, { capabilities: { tools: {} } });
 
+  // Handler 1: metadata-only listing, no side effects.
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: registry.list() }));
 
+  // Handler 2: execution path with profile-aware presentation and normalized errors.
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const { name, arguments: args = {} } = request.params;

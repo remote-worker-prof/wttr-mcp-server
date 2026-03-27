@@ -38,10 +38,12 @@ function normalizePath(path = "") {
 function buildQuery({ query, lang, units, windInMps }) {
   const queryParts = [];
 
+  // Preserve raw query segment first so power users can pass wttr custom options.
   if (typeof query === "string" && query.trim()) {
     queryParts.push(query.trim().replace(/^\?/, ""));
   }
 
+  // Append normalized flags in deterministic order for predictable URL snapshots.
   if (lang) queryParts.push(`lang=${encodeURIComponent(lang)}`);
   if (units === "metric") queryParts.push("m");
   if (units === "us") queryParts.push("u");
@@ -121,6 +123,7 @@ export class WttrClient {
    *   Error: If upstream response status is non-2xx.
    */
   async #request(url, { acceptLanguage, accept }) {
+    // Centralized request path keeps headers and error policy consistent.
     const response = await this.fetchImpl(url, {
       headers: {
         "User-Agent": DEFAULT_UA,

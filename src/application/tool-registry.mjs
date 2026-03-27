@@ -2,6 +2,17 @@ import { parseCurrentFromApi, parseForecastFromApi } from "../domain/weather-par
 import { requireEnum, requireIntInRange, requireString } from "../domain/validation.mjs";
 import { WEATHER_AGENTS, WEATHER_VIEWS, createWeatherViewService } from "./weather-view-service.mjs";
 
+/**
+ * Module overview:
+ *
+ * ToolRegistry is the application-layer composition point for command handlers.
+ * Each command builder encapsulates three concerns for learning clarity:
+ * - JSON schema contract,
+ * - argument validation,
+ * - execution against infrastructure/domain services.
+ *
+ * The registry class then provides a tiny runtime API: list, execute, serialize.
+ */
 const UNITS = ["auto", "metric", "us"];
 const RESPONSE_TYPES = ["text", "json", "base64"];
 
@@ -226,6 +237,7 @@ function createRawRequestTool({ wttrClient }) {
       additionalProperties: false,
     },
     execute: async (args = {}) => {
+      // Normalize all mode flags first to ensure deterministic URL generation.
       const units = normalizeUnits(args.units);
       const responseType = args.responseType || "text";
       requireEnum(responseType, "responseType", RESPONSE_TYPES);
@@ -238,6 +250,7 @@ function createRawRequestTool({ wttrClient }) {
         windInMps: Boolean(args.windInMps),
       });
 
+      // Branch by requested wire format so callers can control payload shape.
       if (responseType === "json") {
         const { json, contentType } = await wttrClient.fetchJson(url, { acceptLanguage: args.acceptLanguage });
         return { ok: true, tool: "wttr_raw_request", url, contentType, data: json };
@@ -474,10 +487,13 @@ export class ToolRegistry {
    *   Error: If tool is unknown or execution fails.
    */
   async execute(name, args = {}) {
+    // Keep dispatch explicit: lookup first, fail fast, then execute.
     const command = this.byName.get(name);
     if (!command) {
       throw new Error(`Unknown tool: ${name}`);
     }
+
+    // Command object owns its own validation and execution policy.
     return command.execute(args);
   }
 
@@ -512,6 +528,7 @@ export class ToolRegistry {
    *   Error: Never thrown intentionally.
    */
   toMcpError(error, code = "UPSTREAM") {
+    // Centralized error shape keeps clients stable across all commands.
     return toMcpErrorPayload(error, code);
   }
 }

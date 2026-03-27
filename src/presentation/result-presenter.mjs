@@ -1,6 +1,14 @@
 import { requireEnum } from "../domain/validation.mjs";
 
 /**
+ * Module overview:
+ *
+ * This layer translates internal tool payloads into MCP response envelopes.
+ * It intentionally demonstrates Strategy + Factory in a compact form so the
+ * presentation policy can evolve without changing domain/application logic.
+ */
+
+/**
  * Declares supported result rendering profiles.
  *
  * Args:
@@ -362,9 +370,14 @@ export class ResultPresenter {
    *   Error: If selected profile is invalid.
    */
   present(value, { profile } = {}) {
+    // 1) Resolve profile.
     const selectedProfile = profile || this.defaultProfile;
     requireEnum(selectedProfile, "profile", RESULT_PROFILES);
+
+    // 2) Delegate payload formatting to the chosen strategy.
     const strategy = this.factory.get(selectedProfile);
+
+    // 3) Return canonical MCP envelope.
     return strategy.present(value);
   }
 }

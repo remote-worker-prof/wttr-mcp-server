@@ -1,6 +1,18 @@
 import { parseCurrentFromApi, parseForecastFromApi } from "../domain/weather-parsers.mjs";
 import { requireEnum, requireIntInRange, requireString } from "../domain/validation.mjs";
 
+/**
+ * Module overview:
+ *
+ * This service is intentionally split into small strategy classes so newcomers can
+ * trace where each rendering decision is made:
+ * 1) validate raw user input,
+ * 2) resolve agent/view defaults,
+ * 3) delegate to a rendering strategy,
+ * 4) wrap output into a stable MCP-friendly payload.
+ *
+ * The split is pedagogical and practical: each strategy can be tested in isolation.
+ */
 const UNITS = ["auto", "metric", "us"];
 
 /**
@@ -212,11 +224,15 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
       windInMps,
     });
 
+    // Step 1: fetch canonical JSON payload from wttr API.
     const { json: apiData, contentType } = await this.wttrClient.fetchJson(url, { acceptLanguage });
+
+    // Step 2: parse to domain DTOs so upper layers do not depend on raw wttr keys.
     const current = parseCurrentFromApi(apiData);
     const nearest = apiData?.nearest_area?.[0] || null;
     const forecast = parseForecastFromApi(apiData, days);
 
+    // Step 3: derive user-facing place label from nearest area metadata.
     const areaName = nearest?.areaName?.[0]?.value || location;
     const country = nearest?.country?.[0]?.value || "";
     const place = country ? `${areaName}, ${country}` : areaName;
@@ -225,6 +241,8 @@ class NormalSummaryStrategy extends WeatherViewStrategy {
       ? `${Math.round((safeNumber(current.windKmph) || 0) / 3.6)} m/s`
       : `${current.windKmph} km/h`;
 
+    // Step 4: assemble a narrative summary with fixed line semantics.
+    // Keeping line order stable is important for clients that diff text output.
     const lines = [
       `Weather: ${place}`,
       `Now: ${current.condition}, ${current.temperatureC}°C (feels ${current.feelsLikeC}°C)`,
@@ -455,17 +473,20 @@ export class WeatherViewService {
    *   Error: If validation fails or upstream request fails.
    */
   async render(args = {}) {
+    // Phase A: strict boundary validation before any network call.
     requireString(args.location, "location");
     const units = normalizeUnits(args.units);
     const days = args.days ?? 2;
     requireIntInRange(days, "days", 1, 3);
 
+    // Phase B: resolve profile defaults and explicit overrides.
     const selected = resolveViewOptions({
       agent: args.agent,
       view: args.view,
       ansi: args.ansi,
     });
 
+    // Phase C: delegate to strategy selected by resolved view.
     const strategy = this.factory.get(selected.view);
     const result = await strategy.render({
       location: args.location,
@@ -477,6 +498,7 @@ export class WeatherViewService {
       ansi: selected.ansi,
     });
 
+    // Phase D: emit a normalized envelope shared by all view strategies.
     return {
       ok: true,
       tool: "wttr_weather_view",
